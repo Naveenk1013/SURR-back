@@ -88,7 +88,7 @@
               <span>Genre: ${song.genre}</span>
               <span>Duration: ${formatDuration(song.duration)}</span>
             </div>
-            <button onclick="playSong('${song.id}', '${song.title}')">Play</button>
+            <button onclick="playSong('${song.id}', &quot;${song.title.replace(/"/g, '&quot;')}&quot;)">Play</button>
             <select onchange="addToPlaylist('${song.id}', this.value)">
               <option value="">Add to Playlist</option>
             </select>
@@ -249,4 +249,5 @@
   </script>
 </body>
 </html>
+
 
