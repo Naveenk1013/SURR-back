@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Surr</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .section { margin-bottom: 20px; }
+    .song-list, .playlist-list { list-style: none; padding: 0; }
+    .song-item, .playlist-item { margin: 10px 0; }
+    audio { width: 100%; max-width: 400px; }
+    .error { color: red; }
+    .success { color: green; }
+    .song-details { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .song-details span { font-weight: bold; }
+    .album-art { width: 100px; height: auto; margin-right: 10px; float: left; }
+    .lyrics-details { margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Music App Test</h1>
+
+  <!-- Upload Song -->
+  <div class="section">
+    <h2>Upload Song</h2>
+    <input type="file" id="songInput" accept="audio/mpeg,audio/flac">
+    <button onclick="uploadSong()">Upload</button>
+    <p id="uploadStatus"></p>
+  </div>
+
+  <!-- Song List -->
+  <div class="section">
+    <h2>Songs</h2>
+    <ul id="songList" class="song-list"></ul>
+    <h3>Now Playing</h3>
+    <audio id="audioPlayer" controls></audio>
+  </div>
+
+  <!-- Create Playlist -->
+  <div class="section">
+    <h2>Create Playlist</h2>
+    <input type="text" id="playlistName" placeholder="Playlist Name">
+    <button onclick="createPlaylist()">Create</button>
+    <p id="playlistStatus"></p>
+  </div>
+
+  <!-- Playlists -->
+  <div class="section">
+    <h2>Playlists</h2>
+    <ul id="playlistList" class="playlist-list"></ul>
+  </div>
+
+  <!-- Search -->
+  <div class="section">
+    <h2>Search Songs</h2>
+    <input type="text" id="searchQuery" placeholder="Search by title or artist">
+    <button onclick="searchSongs()">Search</button>
+    <ul id="searchResults" class="song-list"></ul>
+  </div>
+
+  <script>
+    const API_URL = 'http://localhost:3000';
+
+    // Format duration (seconds to MM:SS)
+    function formatDuration(seconds) {
+      if (!seconds) return '0:00';
+      const minutes = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    // Fetch and display all songs
+    async function fetchSongs() {
+      try {
+        const response = await fetch(`${API_URL}/songs`);
+        const songs = await response.json();
+        const songList = document.getElementById('songList');
+        songList.innerHTML = '';
+        songs.forEach(song => {
+          const li = document.createElement('li');
+          li.className = 'song-item';
+          li.innerHTML = `
+            ${song.albumArt ? `<img src="${song.albumArt}" alt="Album Art" class="album-art" onerror="this.style.display='none'">` : ''}
+            <div class="song-details">
+              <span>Title: ${song.title}</span>
+              <span>Artist: ${song.artist}</span>
+              <span>Album: ${song.album}</span>
+              <span>Genre: ${song.genre}</span>
+              <span>Duration: ${formatDuration(song.duration)}</span>
+            </div>
+            <button onclick="playSong('${song.id}', '${song.title}')">Play</button>
+            <select onchange="addToPlaylist('${song.id}', this.value)">
+              <option value="">Add to Playlist</option>
+            </select>
+            ${song.lyrics ? `<details class="lyrics-details"><summary>View Lyrics</summary><pre>${song.lyrics}</pre></details>` : '<p>No lyrics available</p>'}`;
+          songList.appendChild(li);
+        });
+        updatePlaylistDropdowns();
+      } catch (err) {
+        showStatus('songList', 'Error fetching songs', false);
+      }
+    }
+
+    // Play a song
+    function playSong(songId, title) {
+      const audio = document.getElementById('audioPlayer');
+      audio.src = `${API_URL}/stream/${songId}`;
+      audio.play().catch(err => showStatus('audioPlayer', `Error playing ${title}: ${err}`, false));
+    }
+
+    // Upload a song
+    async function uploadSong() {
+      const fileInput = document.getElementById('songInput');
+      const file = fileInput.files[0];
+      if (!file) return showStatus('uploadStatus', 'No file selected', false);
+
+      const formData = new FormData();
+      formData.append('song', file);
+      try {
+        const response = await fetch(`${API_URL}/upload`, {
+          method: 'POST',
+          body: formData
+        });
+        const result = await response.json();
+        if (response.ok) {
+          showStatus('uploadStatus', `Uploaded: ${result.title} by ${result.artist}`, true);
+          fetchSongs();
+        } else {
+          showStatus('uploadStatus', result.error, false);
+        }
+      } catch (err) {
+        showStatus('uploadStatus', 'Upload failed', false);
+      }
+    }
+
+    // Create a playlist
+    async function createPlaylist() {
+      const name = document.getElementById('playlistName').value;
+      if (!name) return showStatus('playlistStatus', 'Playlist name required', false);
+
+      try {
+        const response = await fetch(`${API_URL}/playlist`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        const result = await response.json();
+        if (response.ok) {
+          showStatus('playlistStatus', `Created: ${result.name}`, true);
+          fetchPlaylists();
+        } else {
+          showStatus('playlistStatus', result.error, false);
+        }
+      } catch (err) {
+        showStatus('playlistStatus', 'Failed to create playlist', false);
+      }
+    }
+
+    // Fetch and display playlists
+    async function fetchPlaylists() {
+      try {
+        const response = await fetch(`${API_URL}/playlist`);
+        const playlists = await response.json();
+        const playlistList = document.getElementById('playlistList');
+        playlistList.innerHTML = '';
+        playlists.forEach(playlist => {
+          const li = document.createElement('li');
+          li.className = 'playlist-item';
+          li.innerHTML = `${playlist.name} (${playlist.songs.length} songs)`;
+          playlistList.appendChild(li);
+        });
+        updatePlaylistDropdowns();
+      } catch (err) {
+        showStatus('playlistList', 'Error fetching playlists', false);
+      }
+    }
+
+    // Add song to playlist
+    async function addToPlaylist(songId, playlistId) {
+      if (!playlistId) return;
+      try {
+        const response = await fetch(`${API_URL}/playlist/${playlistId}/add`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ songId })
+        });
+        const result = await response.json();
+        if (response.ok) {
+          showStatus('playlistList', `Added to ${result.name}`, true);
+          fetchPlaylists();
+        } else {
+          showStatus('playlistList', result.error, false);
+        }
+      } catch (err) {
+        showStatus('playlistList', 'Failed to add to playlist', false);
+      }
+    }
+
+    // Update playlist dropdowns
+    async function updatePlaylistDropdowns() {
+      try {
+        const response = await fetch(`${API_URL}/playlist`);
+        const playlists = await response.json();
+        document.querySelectorAll('.song-item select').forEach(select => {
+          select.innerHTML = '<option value="">Add to Playlist</option>';
+          playlists.forEach(playlist => {
+            const option = document.createElement('option');
+            option.value = playlist.id;
+            option.textContent = playlist.name;
+            select.appendChild(option);
+          });
+        });
+      } catch (err) {
+        console.error('Error updating playlist dropdowns:', err);
+      }
+    }
+
+    // Search songs
+    async function searchSongs() {
+      const query = document.getElementById('searchQuery').value;
+      try {
+        const response = await fetch(`${API_URL}/search?q=${encodeURIComponent(query)}`);
+        const songs = await response.json();
+        const searchResults = document.getElementById('searchResults');
+        searchResults.innerHTML = '';
+        songs.forEach(song => {
+          const li = document.createElement('li');
+          li.className = 'song-item';
+          li.innerHTML = `
+            ${song.albumArt ? `<img src="${song.albumArt}" alt="Album Art" class="album-art" onerror="this.style.display='none'">` : ''}
+            <div class="song-details">
+              <span>Title: ${song.title}</span>
+              <span>Artist: ${song.artist}</span>
+              <span>Album: ${song.album}</span>
+              <span>Genre: ${song.genre}</span>
+              <span>Duration: ${formatDuration(song.duration)}</span>
+            </div>
+            <button onclick="playSong('${song.id}', '${song.title}')">Play</button>
+            ${song.lyrics ? `<details class="lyrics-details"><summary>View Lyrics</summary><pre>${song.lyrics}</pre></details>` : '<p>No lyrics available</p>'}`;
+          searchResults.appendChild(li);
+        });
+      } catch (err) {
+        showStatus('searchResults', 'Error searching songs', false);
+      }
+    }
+
+    // Show status message
+    function showStatus(elementId, message, isSuccess) {
+      const element = document.getElementById(elementId);
+      element.textContent = message;
+      element.className = isSuccess ? 'success' : 'error';
+    }
+
+    // Initial fetch
+    fetchSongs();
+    fetchPlaylists();
+  </script>
+</body>
+</html>
