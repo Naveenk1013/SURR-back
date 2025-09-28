@@ -60,9 +60,9 @@
   </div>
 
   <script>
-    const API_URL = 'http://localhost:3000';
+    // CHANGE THIS TO YOUR RENDER BACKEND URL
+    const API_URL = 'https://https://surr-back.onrender.com';
 
-    // Format duration (seconds to MM:SS)
     function formatDuration(seconds) {
       if (!seconds) return '0:00';
       const minutes = Math.floor(seconds / 60);
@@ -70,7 +70,6 @@
       return `${minutes}:${secs.toString().padStart(2, '0')}`;
     }
 
-    // Fetch and display all songs
     async function fetchSongs() {
       try {
         const response = await fetch(`${API_URL}/songs`);
@@ -102,14 +101,12 @@
       }
     }
 
-    // Play a song
     function playSong(songId, title) {
       const audio = document.getElementById('audioPlayer');
       audio.src = `${API_URL}/stream/${songId}`;
       audio.play().catch(err => showStatus('audioPlayer', `Error playing ${title}: ${err}`, false));
     }
 
-    // Upload a song
     async function uploadSong() {
       const fileInput = document.getElementById('songInput');
       const file = fileInput.files[0];
@@ -134,7 +131,6 @@
       }
     }
 
-    // Create a playlist
     async function createPlaylist() {
       const name = document.getElementById('playlistName').value;
       if (!name) return showStatus('playlistStatus', 'Playlist name required', false);
@@ -157,7 +153,6 @@
       }
     }
 
-    // Fetch and display playlists
     async function fetchPlaylists() {
       try {
         const response = await fetch(`${API_URL}/playlist`);
@@ -176,7 +171,6 @@
       }
     }
 
-    // Add song to playlist
     async function addToPlaylist(songId, playlistId) {
       if (!playlistId) return;
       try {
@@ -197,7 +191,6 @@
       }
     }
 
-    // Update playlist dropdowns
     async function updatePlaylistDropdowns() {
       try {
         const response = await fetch(`${API_URL}/playlist`);
@@ -216,7 +209,6 @@
       }
     }
 
-    // Search songs
     async function searchSongs() {
       const query = document.getElementById('searchQuery').value;
       try {
@@ -245,7 +237,6 @@
       }
     }
 
-    // Show status message
     function showStatus(elementId, message, isSuccess) {
       const element = document.getElementById(elementId);
       element.textContent = message;
